@@ -1,0 +1,77 @@
+@import "./tailwind.css";
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --bg-base:        #111210;
+  --bg-surface:     #1a1917;
+  --bg-raised:      #222120;
+  --bg-wash:        #2a2825;
+
+  --text-primary:   #ffffff;
+  --text-secondary: #e6e3dd;
+  --text-ghost:     #a8a59e;
+
+  --accent-ink:     rgba(192, 57, 43, 0.6);
+  --accent-warm:    #b5651d;
+  --accent-muted:   rgba(192, 57, 43, 0.15);
+
+  --status-ahead:   #c0392b;
+  --status-behind:  #7a6a5a;
+  --status-dirty:   #b5651d;
+  --status-clean:   #4a5a4a;
+  --status-unlinked:#3a3530;
+
+  --border-subtle:  rgba(255, 255, 255, 0.05);
+  --border-active:  rgba(192, 57, 43, 0.3);
+
+  --font-mono:      "DM Mono", monospace;
+  --font-sans:      "Inter", sans-serif;
+
+  --text-xs:        11px;
+  --text-sm:        13px;
+  --text-base:      15px;
+  --text-lg:        18px;
+  --text-xl:        24px;
+  --text-2xl:       32px;
+}
+
+body {
+  background-color: var(--bg-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  height: 100vh;
+  width: 100vw;
+}
+
+.grain-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9999;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0%200%20200%20200'%20xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%3E%3Cfilter%20id='noiseFilter'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.65'%20numOctaves='3'%20stitchTiles='stitch'%2F%3E%3C%2Ffilter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23noiseFilter)'%2F%3E%3C%2Fsvg%3E");
+  opacity: 0.035;
+}
+
+/* Custom scrollbar styling */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-surface);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--text-ghost);
+  border-radius: 4px;
+  border: 1px solid var(--bg-surface);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
