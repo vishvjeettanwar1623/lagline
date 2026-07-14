@@ -23,7 +23,7 @@ export const RepoList: React.FC<RepoListProps> = ({ width = 270 }) => {
 
   const [filter, setFilter] = useState<'all' | 'github' | 'local'>('all');
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; repoPath: string } | null>(null);
-  const [techFilter, setTechFilter] = useState<string>('all');
+  const [sortChanges, setSortChanges] = useState<'changes-first' | 'no-changes-first'>('changes-first');
 
   const filteredRepos = repos.filter((r) => {
     // Filter out ignored repositories
@@ -38,17 +38,12 @@ export const RepoList: React.FC<RepoListProps> = ({ width = 270 }) => {
       return false;
     }
 
-    // 2. Tech filter
-    if (techFilter !== 'all') {
-      if (techFilter === 'other') {
-        if (r.projectType) return false;
-      } else {
-        if (r.projectType !== techFilter) return false;
-      }
-    }
-
     return true;
   });
+
+  const hasGitChanges = (r: typeof repos[0]) => {
+    return r.status === 'dirty' || r.status === 'ahead' || r.status === 'behind' || r.status === 'diverged';
+  };
 
   const sortedRepos = [...filteredRepos].sort((a, b) => {
     const isPinnedA = config?.pinnedPaths?.includes(a.localPath) || false;
@@ -57,14 +52,15 @@ export const RepoList: React.FC<RepoListProps> = ({ width = 270 }) => {
     if (isPinnedA && !isPinnedB) return -1;
     if (!isPinnedA && isPinnedB) return 1;
 
-    const hasChangesA = a.changedFiles && a.changedFiles.length > 0;
-    const hasChangesB = b.changedFiles && b.changedFiles.length > 0;
+    const changesA = hasGitChanges(a);
+    const changesB = hasGitChanges(b);
 
-    if (hasChangesA && !hasChangesB) {
-      return -1;
-    }
-    if (!hasChangesA && hasChangesB) {
-      return 1;
+    if (sortChanges === 'changes-first') {
+      if (changesA && !changesB) return -1;
+      if (!changesA && changesB) return 1;
+    } else {
+      if (!changesA && changesB) return -1;
+      if (changesA && !changesB) return 1;
     }
 
     const timeA = a.lastCommitTime ? new Date(a.lastCommitTime).getTime() : 0;
@@ -221,21 +217,12 @@ export const RepoList: React.FC<RepoListProps> = ({ width = 270 }) => {
         </select>
 
         <select
-          value={techFilter}
-          onChange={(e) => setTechFilter(e.target.value)}
+          value={sortChanges}
+          onChange={(e) => setSortChanges(e.target.value as 'changes-first' | 'no-changes-first')}
           className="flex-1 bg-bg-surface text-text-secondary border border-border-subtle rounded px-2 py-1 focus:outline-none focus:border-border-active cursor-pointer text-xs"
         >
-          <option value="all">All Techs</option>
-          <option value="rust">Rust</option>
-          <option value="javascript">JS</option>
-          <option value="python">Python</option>
-          <option value="go">Go</option>
-          <option value="java">Java</option>
-          <option value="php">PHP</option>
-          <option value="cpp">C++</option>
-          <option value="swift">Swift</option>
-          <option value="flutter">Flutter</option>
-          <option value="other">Other</option>
+          <option value="changes-first">Changes First</option>
+          <option value="no-changes-first">No Changes First</option>
         </select>
       </div>
       {/* Search Bar */}

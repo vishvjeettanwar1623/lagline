@@ -83,46 +83,6 @@ export const RepoListItem: React.FC<RepoListItemProps> = ({ repo, isSelected, on
     return label;
   };
 
-  const getProjectTypeBadge = (type: string | null | undefined) => {
-    let colorClass = 'bg-bg-wash text-text-ghost border-border-subtle';
-    let label = 'Other';
-
-    if (type === 'rust') {
-      colorClass = 'bg-[#3b2d24] text-[#d3864a] border-[#5e412f]';
-      label = 'Rust';
-    } else if (type === 'javascript') {
-      colorClass = 'bg-[#363920] text-[#c9c542] border-[#57532a]';
-      label = 'JS';
-    } else if (type === 'python') {
-      colorClass = 'bg-[#212d3a] text-[#5c98cf] border-[#31485e]';
-      label = 'Python';
-    } else if (type === 'go') {
-      colorClass = 'bg-[#1a353d] text-[#4ec2e0] border-[#295461]';
-      label = 'Go';
-    } else if (type === 'java') {
-      colorClass = 'bg-[#362020] text-[#c94242] border-[#572a2a]';
-      label = 'Java';
-    } else if (type === 'php') {
-      colorClass = 'bg-[#29233b] text-[#9b8ac9] border-[#44385e]';
-      label = 'PHP';
-    } else if (type === 'cpp') {
-      colorClass = 'bg-[#202b3a] text-[#5e94cf] border-[#314860]';
-      label = 'C++';
-    } else if (type === 'swift') {
-      colorClass = 'bg-[#3b2920] text-[#cf7a5e] border-[#5d3b2f]';
-      label = 'Swift';
-    } else if (type === 'flutter') {
-      colorClass = 'bg-[#1a313d] text-[#4eaee0] border-[#294c61]';
-      label = 'Flutter';
-    }
-
-    return (
-      <span className={`px-1 py-0.5 text-[8px] font-mono rounded border ${colorClass} shrink-0`}>
-        {label}
-      </span>
-    );
-  };
-
   return (
     <button
       onClick={onClick}
@@ -145,7 +105,6 @@ export const RepoListItem: React.FC<RepoListItemProps> = ({ repo, isSelected, on
             {repo.name}
             {isPinned && <span className="text-[#d2a374] text-xs">★</span>}
           </span>
-          {getProjectTypeBadge(repo.projectType)}
         </div>
         <div className="text-xs font-mono text-text-secondary mt-0.5">
           {getStatusLabel()}
