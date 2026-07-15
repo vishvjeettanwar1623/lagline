@@ -26,7 +26,6 @@ export interface RepoInfo {
   behindCommits?: AheadCommit[];   // remote commits not present locally
   lastScanned: string;             // ISO string
   remoteType: 'github' | 'other' | null;
-  projectType?: string | null;
 }
 
 export interface AppConfig {
