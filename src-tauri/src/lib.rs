@@ -30,6 +30,45 @@ pub fn update_tray_icon(app: &tauri::AppHandle, repos: &[RepoInfo]) {
     }
 }
 
+pub async fn validate_path(app: &tauri::AppHandle, path: &str) -> Result<(), String> {
+    let config = crate::config::load_config(app.clone())
+        .await
+        .map_err(|e| format!("Failed to load config: {}", e))?;
+        
+    let root_path = config.root_path
+        .ok_or_else(|| "Root path is not configured in settings".to_string())?;
+        
+    let canonical_root = std::path::Path::new(&root_path)
+        .canonicalize()
+        .map_err(|e| format!("Failed to resolve root path: {}", e))?;
+        
+    let target_path = std::path::Path::new(path);
+    if !target_path.exists() {
+        return Err("Target folder does not exist".to_string());
+    }
+    
+    let canonical_target = target_path
+        .canonicalize()
+        .map_err(|e| format!("Failed to resolve target path: {}", e))?;
+        
+    if canonical_target.starts_with(canonical_root) {
+        Ok(())
+    } else {
+        Err("Access Denied: Path resides outside the configured root directory".to_string())
+    }
+}
+
+pub fn validate_root_path(path: &str) -> Result<(), String> {
+    let p = std::path::Path::new(path);
+    if !p.exists() {
+        return Err("Root folder does not exist".to_string());
+    }
+    if !p.is_dir() {
+        return Err("Root path is not a directory".to_string());
+    }
+    Ok(())
+}
+
 fn is_actual_project_file(entry_path: &std::path::Path) -> bool {
     let name = match entry_path.file_name().and_then(|s| s.to_str()) {
         Some(n) => n,
@@ -158,7 +197,6 @@ fn create_non_git_placeholder(path: &std::path::Path) -> RepoInfo {
         behind_commits: Vec::new(),
         last_scanned: chrono::Utc::now().to_rfc3339(),
         remote_type: None,
-        project_type: git_ops::detect_project_type(path),
     }
 }
 
@@ -198,11 +236,13 @@ fn setup_watcher(app: tauri::AppHandle, path_str: &str) -> Result<notify::Recomm
 }
 
 #[tauri::command]
-async fn open_terminal(path: String) -> Result<(), String> {
+async fn open_terminal(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    validate_path(&app, &path).await?;
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("cmd.exe")
-            .args(&["/c", "start", "powershell.exe", "-NoExit", "-WorkingDirectory", &path])
+        std::process::Command::new("powershell.exe")
+            .args(&["-NoExit"])
+            .current_dir(&path)
             .spawn()
             .map_err(|e| e.to_string())?;
     }
@@ -222,6 +262,7 @@ async fn scan_repos(
     root_path: String,
     state: tauri::State<'_, AppWatcherState>
 ) -> Result<Vec<RepoInfo>, String> {
+    validate_root_path(&root_path)?;
     // Setup or update filesystem watcher
     {
         let mut current = state.current_path.lock().unwrap();
@@ -267,23 +308,27 @@ async fn scan_repos(
 }
 
 #[tauri::command]
-async fn get_repo_detail(repo_path: String) -> Result<RepoInfo, String> {
+async fn get_repo_detail(app: tauri::AppHandle, repo_path: String) -> Result<RepoInfo, String> {
+    validate_path(&app, &repo_path).await?;
     let path = std::path::Path::new(&repo_path);
     git_ops::get_repo_info(path)
 }
 
 #[tauri::command]
-async fn open_in_explorer(path: String) -> Result<(), String> {
+async fn open_in_explorer(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    validate_path(&app, &path).await?;
     git_ops::open_explorer(&path)
 }
 
 #[tauri::command]
-async fn open_in_vscode(path: String) -> Result<(), String> {
+async fn open_in_vscode(app: tauri::AppHandle, path: String) -> Result<(), String> {
+    validate_path(&app, &path).await?;
     git_ops::open_vscode(&path)
 }
 
 #[tauri::command]
 async fn get_total_folders(root_path: String) -> Result<usize, String> {
+    validate_root_path(&root_path)?;
     let mut count = 0;
     if let Ok(entries) = std::fs::read_dir(&root_path) {
         for entry_res in entries {

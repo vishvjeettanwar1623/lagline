@@ -35,7 +35,6 @@ pub struct RepoInfo {
     pub behind_commits: Vec<AheadCommit>,
     pub last_scanned: String,
     pub remote_type: Option<String>, // "github" | "other"
-    pub project_type: Option<String>,
 }
 
 pub fn get_branch_name(repo: &Repository) -> Result<String, String> {
@@ -272,8 +271,6 @@ pub fn get_repo_info(path: &Path) -> Result<RepoInfo, String> {
     let status = determine_status(&remote_url, ahead_count, behind_count, has_changes);
     let last_scanned = Utc::now().to_rfc3339();
     
-    let project_type = detect_project_type(path);
-    
     Ok(RepoInfo {
         id: local_path.clone(),
         name,
@@ -289,32 +286,7 @@ pub fn get_repo_info(path: &Path) -> Result<RepoInfo, String> {
         behind_commits: Vec::new(),
         last_scanned,
         remote_type,
-        project_type,
     })
-}
-
-pub fn detect_project_type(path: &Path) -> Option<String> {
-    if path.join("package.json").exists() {
-        Some("javascript".to_string())
-    } else if path.join("Cargo.toml").exists() {
-        Some("rust".to_string())
-    } else if path.join("go.mod").exists() {
-        Some("go".to_string())
-    } else if path.join("requirements.txt").exists() || path.join("pyproject.toml").exists() || path.join("setup.py").exists() {
-        Some("python".to_string())
-    } else if path.join("pom.xml").exists() || path.join("build.gradle").exists() {
-        Some("java".to_string())
-    } else if path.join("composer.json").exists() {
-        Some("php".to_string())
-    } else if path.join("CMakeLists.txt").exists() {
-        Some("cpp".to_string())
-    } else if path.join("package.swift").exists() {
-        Some("swift".to_string())
-    } else if path.join("pubspec.yaml").exists() {
-        Some("flutter".to_string())
-    } else {
-        None
-    }
 }
 
 #[cfg(target_os = "windows")]
@@ -346,8 +318,13 @@ pub fn open_explorer(path: &str) -> Result<(), String> {
 
 #[cfg(target_os = "windows")]
 pub fn open_vscode(path: &str) -> Result<(), String> {
-    std::process::Command::new("cmd")
-        .args(&["/C", "code", path])
+    std::process::Command::new("powershell.exe")
+        .args(&[
+            "-NoProfile",
+            "-Command",
+            "& { Start-Process code -ArgumentList @($args[0]) }",
+        ])
+        .arg(path)
         .spawn()
         .map_err(|e| e.to_string())?;
     Ok(())
