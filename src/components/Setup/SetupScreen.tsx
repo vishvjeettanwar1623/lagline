@@ -60,25 +60,29 @@ export const SetupScreen: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-bg-base text-text-primary font-sans p-6">
-      <div className="w-full max-w-md bg-bg-surface p-8 rounded-lg border border-border-subtle shadow-lg">
-        <div className="flex items-center gap-3 mb-2">
-          <img src="/logo.svg" alt="LagLine Logo" className="w-8 h-8 object-contain" />
-          <h1 className="text-2xl font-mono text-text-primary tracking-tight font-bold">LagLine</h1>
+    <div className="flex flex-col items-center justify-center min-h-screen bg-[#09090b] text-[#f4f4f5] font-sans p-6 select-none">
+      <div className="w-full max-w-md bg-[#0f0f12] p-8 rounded-xl border border-[#27272a] shadow-2xl space-y-6">
+        <div className="space-y-1">
+          <div className="flex items-center gap-2.5">
+            <div className="w-6 h-6 rounded bg-white text-black flex items-center justify-center font-bold text-xs font-mono shadow-xs">
+              L
+            </div>
+            <h1 className="text-xl font-mono text-white tracking-tight font-bold">LagLine</h1>
+          </div>
+          <p className="text-[#71717a] text-xs font-sans">
+            High-density desktop Git status and workspace sync matrix
+          </p>
         </div>
-        <p className="text-text-secondary text-sm mb-6 border-b border-border-subtle pb-4">
-          A local Git repository sync dashboard.
-        </p>
 
         {error && (
-          <div className="mb-4 p-3 bg-red-950/30 border border-status-ahead/30 text-status-ahead text-xs rounded">
+          <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-400 text-xs font-mono rounded-md">
             {error}
           </div>
         )}
 
         <form onSubmit={handleStartScanning} className="space-y-5">
-          <div>
-            <label className="block text-text-secondary text-xs uppercase tracking-wider mb-2 font-mono">
+          <div className="space-y-2">
+            <label className="block text-[#71717a] text-[10px] uppercase tracking-wider font-mono font-bold">
               Where do you keep your projects?
             </label>
             <div className="flex gap-2">
@@ -87,21 +91,21 @@ export const SetupScreen: React.FC = () => {
                 value={rootPath}
                 onChange={(e) => setRootPath(e.target.value)}
                 placeholder="C:/Users/name/Documents/Dev"
-                className="flex-1 bg-bg-wash text-text-primary text-sm px-3 py-2 rounded border border-border-subtle focus:outline-none focus:border-accent-ink"
+                className="flex-1 bg-[#141418] text-white text-xs font-mono px-3 py-2 rounded-md border border-[#27272a] focus:outline-none focus:border-[#52525b]"
               />
               <button
                 type="button"
                 onClick={handlePickFolder}
-                className="bg-bg-wash hover:bg-bg-raised text-text-primary p-2 rounded border border-border-subtle transition-colors duration-150"
+                className="bg-[#141418] hover:bg-[#1c1c21] text-white p-2 rounded-md border border-[#27272a] transition-colors"
                 title="Browse folder"
               >
-                <Folder className="w-4 h-4 text-text-secondary" />
+                <Folder className="w-4 h-4 text-white" />
               </button>
             </div>
           </div>
 
-          <div>
-            <label className="block text-text-secondary text-xs uppercase tracking-wider mb-2 font-mono">
+          <div className="space-y-2">
+            <label className="block text-[#71717a] text-[10px] uppercase tracking-wider font-mono font-bold">
               GitHub Token (optional)
             </label>
             <div className="relative">
@@ -110,17 +114,17 @@ export const SetupScreen: React.FC = () => {
                 value={githubToken}
                 onChange={(e) => setGithubToken(e.target.value)}
                 placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
-                className="w-full bg-bg-wash text-text-primary text-sm pl-3 pr-10 py-2 rounded border border-border-subtle focus:outline-none focus:border-accent-ink"
+                className="w-full bg-[#141418] text-white text-xs font-mono pl-3 pr-10 py-2 rounded-md border border-[#27272a] focus:outline-none focus:border-[#52525b]"
               />
               <button
                 type="button"
                 onClick={() => setShowToken(!showToken)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-text-ghost hover:text-text-secondary"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-[#71717a] hover:text-white"
               >
                 {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
             </div>
-            <p className="text-[11px] text-text-ghost mt-1.5 leading-relaxed">
+            <p className="text-[11px] text-[#71717a] leading-relaxed">
               Used to check remote state. Read-only repo scope is enough.
             </p>
           </div>
@@ -128,9 +132,9 @@ export const SetupScreen: React.FC = () => {
           <button
             type="submit"
             disabled={isScanning}
-            className="w-full mt-6 bg-accent-ink hover:bg-accent-ink/80 text-text-primary font-mono text-sm py-2.5 rounded transition-all duration-150 disabled:opacity-50 flex items-center justify-center gap-2"
+            className="w-full mt-6 bg-white hover:bg-[#e4e4e7] text-black font-mono text-xs font-bold py-2.5 rounded-md transition-all duration-150 disabled:opacity-50 flex items-center justify-center gap-2 shadow-xs"
           >
-            {isScanning ? 'Scanning...' : 'Start scanning'}
+            {isScanning ? 'Scanning workspace...' : 'Start scanning workspace'}
             {!isScanning && <ArrowRight className="w-4 h-4" />}
           </button>
         </form>
