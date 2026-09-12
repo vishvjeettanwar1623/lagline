@@ -6,34 +6,28 @@ interface StatusDotProps {
 }
 
 export const StatusDot: React.FC<StatusDotProps> = ({ status }) => {
-  const getStyle = () => {
+  const getStyleClass = () => {
     switch (status) {
       case 'ahead':
-        return { backgroundColor: 'var(--status-ahead)' };
+        return 'bg-rose-400 aura-rose';
       case 'behind':
-        return { backgroundColor: 'var(--status-behind)' };
+        return 'bg-purple-400 aura-purple';
       case 'dirty':
-        return { backgroundColor: 'var(--status-dirty)' };
+        return 'bg-amber-400 aura-amber';
       case 'clean':
-        return { backgroundColor: 'var(--status-clean)' };
+        return 'bg-emerald-400 aura-emerald';
       case 'diverged':
-        return {
-          background: 'linear-gradient(90deg, var(--status-ahead) 50%, var(--status-behind) 50%)',
-        };
+        return 'bg-gradient-to-r from-rose-400 to-purple-400 aura-rose';
       case 'unlinked':
-        return {
-          border: '1.5px solid var(--status-unlinked)',
-          backgroundColor: 'transparent',
-        };
+      case 'non-git':
       default:
-        return { backgroundColor: 'var(--text-ghost)' };
+        return 'bg-zinc-500/60';
     }
   };
 
   return (
     <div
-      className="w-1.5 h-1.5 rounded-full shrink-0"
-      style={getStyle()}
+      className={`w-2 h-2 rounded-full shrink-0 transition-all duration-300 ${getStyleClass()}`}
       title={`Status: ${status}`}
     />
   );
