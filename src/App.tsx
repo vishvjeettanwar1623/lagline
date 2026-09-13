@@ -170,3 +170,186 @@ export const App: React.FC = () => {
             console.error('Failed to open VSCode:', err)
           );
         }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedRepoId, repos, config, selectRepo, isScanning]);
+
+  // Listen to background rescan events from tray icon
+  useEffect(() => {
+    const unlistenPromise = listen('repos-scanned', (event: any) => {
+      if (Array.isArray(event.payload)) {
+        setRepos(event.payload);
+        if (event.payload.length > 0 && !selectedRepoId) {
+          selectRepo(event.payload[0].id);
+        }
+      }
+    });
+
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [setRepos, selectedRepoId, selectRepo]);
+
+  // Listen to scan progress updates
+  useEffect(() => {
+    const { setScanProgress } = useRepoStore.getState();
+    const unlistenPromise = listen('scan-progress', (event: any) => {
+      if (event.payload) {
+        setScanProgress(event.payload);
+      }
+    });
+
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, []);
+
+  // Listen to filesystem watcher changes for automatic rescan
+  useEffect(() => {
+    if (!config?.rootPath) return;
+
+    const unlistenPromise = listen('watcher-rescan', async () => {
+      if (isScanning || isSyncing) return;
+      setIsScanning(true);
+      const { setScanProgress, showToast } = useRepoStore.getState();
+      setScanProgress({ current: 0, total: 100, folderName: 'Auto-detecting file changes...' });
+      try {
+        const [scannedRepos, total]: any = await Promise.all([
+          invoke('scan_repos', { rootPath: config.rootPath }),
+          invoke('get_total_folders', { rootPath: config.rootPath }),
+        ]);
+        setRepos(scannedRepos);
+        setTotalFolders(total);
+        showToast('Workspace auto-updated from disk', 'success');
+      } catch (err) {
+        console.error('Auto rescan failed:', err);
+      } finally {
+        setIsScanning(false);
+        setScanProgress(null);
+      }
+    });
+
+    return () => {
+      unlistenPromise.then((unlisten) => unlisten());
+    };
+  }, [config?.rootPath, isScanning, isSyncing, setRepos, setTotalFolders, setIsScanning]);
+
+
+
+  if (loadingConfig) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-[var(--bg-base)] text-[var(--text-secondary)] font-mono text-xs select-none">
+        <div className="animate-spin w-4 h-4 border-2 border-current border-t-transparent rounded-full mb-3" />
+        <span>Initializing LagLine...</span>
+      </div>
+    );
+  }
+
+  const hasNoRepos = repos.length === 0;
+
+  return (
+    <div className="flex flex-col h-screen w-screen bg-[var(--bg-base)] text-[var(--text-primary)] overflow-hidden font-sans select-none transition-colors">
+      {error && (
+        <div className="fixed top-3 left-3 z-50 p-2.5 bg-[var(--bg-raised)] border border-rose-500/30 text-rose-400 text-xs font-mono rounded shadow-xl">
+          Initialization error: {error}
+        </div>
+      )}
+
+      {config?.rootPath ? (
+        hasNoRepos && !isScanning ? (
+          <div className="flex flex-col items-center justify-center min-h-screen bg-[#09090b] text-[#f4f4f5] font-sans p-6 text-center select-none animate-fadeIn">
+            <h1 className="text-base font-mono font-semibold text-white mb-2">No Git Repositories Found</h1>
+            <p className="text-xs text-[#71717a] max-w-sm mb-5 font-sans">
+              No Git repositories found in <code className="text-[#a1a1aa] text-xs font-mono bg-[#141418] border border-[#27272a] px-2 py-0.5 rounded">{config.rootPath}</code>.
+            </p>
+            <button
+              onClick={() => setIsSettingsOpen(true)}
+              className="text-xs font-mono text-black bg-white hover:bg-[#e4e4e7] px-4 py-2 rounded-md font-semibold transition-colors shadow-xs"
+            >
+              Change Root Folder
+            </button>
+            <Settings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+          </div>
+        ) : (
+          <>
+            {/* Docked Desktop Top Navbar */}
+            <Navbar
+              onOpenSettings={() => setIsSettingsOpen(true)}
+              onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+              activeView={activeView}
+              setActiveView={setActiveView}
+              handleRescan={handleRescan}
+              handleCompare={handleCompare}
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+            />
+
+            {/* Main Edge-to-Edge Desktop Layout */}
+            <div className="flex-1 flex overflow-hidden relative">
+              {isSidebarOpen && (
+                <>
+                  <RepoList width={sidebarWidth} activeView={activeView} />
+
+                  {/* Split Resizer */}
+                  <div
+                    onMouseDown={startResizing}
+                    className={`w-[1px] hover:w-[2px] bg-[var(--border-subtle)] hover:bg-[var(--border-strong)] cursor-col-resize transition-all shrink-0 h-full ${
+                      isResizing ? 'bg-[var(--border-strong)] w-[2px]' : ''
+                    }`}
+                  />
+                </>
+              )}
+
+              {/* Main Workspace Editor Pane */}
+              <RepoDetail />
+            </div>
+
+            {/* Slide-over Settings Drawer */}
+            <Settings isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+
+            {/* Command Palette */}
+            <CommandPalette
+              isOpen={isCommandPaletteOpen}
+              onClose={() => setIsCommandPaletteOpen(false)}
+              onOpenSettings={() => setIsSettingsOpen(true)}
+              onRescan={handleRescan}
+              onCompare={handleCompare}
+              setActiveView={setActiveView}
+            />
+          </>
+        )
+      ) : (
+        <SetupScreen />
+      )}
+
+      <ToastComponent />
+    </div>
+  );
+};
+
+const ToastComponent: React.FC = () => {
+  const toast = useRepoStore((state) => state.toast);
+  if (!toast) return null;
+
+  return (
+    <div
+      className={`fixed bottom-4 right-4 z-50 flex items-center gap-2 px-3 py-2 rounded border font-mono text-xs shadow-xl animate-fadeIn ${
+        toast.type === 'success'
+          ? 'bg-[#1f1f1f] border-[#89d185]/40 text-[#89d185]'
+          : 'bg-[#1f1f1f] border-[#f14c4c]/40 text-[#f14c4c]'
+      }`}
+    >
+      <span
+        className={`w-2 h-2 rounded-full ${
+          toast.type === 'success' ? 'bg-[#89d185]' : 'bg-[#f14c4c]'
+        }`}
+      />
+      <span>{toast.message}</span>
+    </div>
+  );
+};
+
+export default App;
