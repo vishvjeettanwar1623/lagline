@@ -1,39 +1,31 @@
 @import "./tailwind.css";
 
-@import url('https://fonts.googleapis.com/css2?family=DM+Mono:ital,wght@0,300;0,400;0,500;1,300;1,400;1,500&family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --bg-base:        #111210;
-  --bg-surface:     #1a1917;
-  --bg-raised:      #222120;
-  --bg-wash:        #2a2825;
+  --bg-base:        #f8fafc;
+  --bg-surface:     #ffffff;
+  --bg-raised:      #f1f5f9;
+  --bg-hover:       #e2e8f0;
+  --bg-active:      #ffffff;
+  --bg-input:       #ffffff;
 
-  --text-primary:   #ffffff;
-  --text-secondary: #e6e3dd;
-  --text-ghost:     #a8a59e;
+  --text-primary:   #0f172a;
+  --text-secondary: #334155;
+  --text-muted:     #64748b;
+  --text-ghost:     #94a3b8;
 
-  --accent-ink:     rgba(192, 57, 43, 0.6);
-  --accent-warm:    #b5651d;
-  --accent-muted:   rgba(192, 57, 43, 0.15);
+  --border-subtle:  #e2e8f0;
+  --border-strong:  #cbd5e1;
 
-  --status-ahead:   #c0392b;
-  --status-behind:  #7a6a5a;
-  --status-dirty:   #b5651d;
-  --status-clean:   #4a5a4a;
-  --status-unlinked:#3a3530;
+  --badge-bg:       #f1f5f9;
+  --brand-fg:       #ffffff;
+  --brand-bg:       #0f172a;
+  --btn-primary-bg: #0f172a;
+  --btn-primary-fg: #ffffff;
 
-  --border-subtle:  rgba(255, 255, 255, 0.05);
-  --border-active:  rgba(192, 57, 43, 0.3);
-
-  --font-mono:      "DM Mono", monospace;
-  --font-sans:      "Inter", sans-serif;
-
-  --text-xs:        11px;
-  --text-sm:        13px;
-  --text-base:      15px;
-  --text-lg:        18px;
-  --text-xl:        24px;
-  --text-2xl:       32px;
+  --font-mono:      "JetBrains Mono", monospace;
+  --font-sans:      "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 body {
@@ -45,33 +37,40 @@ body {
   overflow: hidden;
   height: 100vh;
   width: 100vw;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .grain-overlay {
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 9999;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0%200%20200%20200'%20xmlns='http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%3E%3Cfilter%20id='noiseFilter'%3E%3CfeTurbulence%20type='fractalNoise'%20baseFrequency='0.65'%20numOctaves='3'%20stitchTiles='stitch'%2F%3E%3C%2Ffilter%3E%3Crect%20width='100%25'%20height='100%25'%20filter='url(%23noiseFilter)'%2F%3E%3C%2Fsvg%3E");
-  opacity: 0.035;
+  display: none;
 }
 
-/* Custom scrollbar styling */
+/* Sleek subtle custom scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--bg-surface);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--text-ghost);
-  border-radius: 4px;
-  border: 1px solid var(--bg-surface);
+  background: rgba(120, 120, 120, 0.2);
+  border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-secondary);
+  background: rgba(120, 120, 120, 0.4);
 }
+
+.sleek-panel {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+}
+
+.sleek-card {
+  background: var(--bg-raised);
+  border: 1px solid var(--border-subtle);
+}
+

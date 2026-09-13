@@ -26,6 +26,15 @@ export interface RepoInfo {
   behindCommits?: AheadCommit[];   // remote commits not present locally
   lastScanned: string;             // ISO string
   remoteType: 'github' | 'other' | null;
+  projectType?: string | null;
+}
+
+export interface HeavyFolderInfo {
+  name: string;
+  relativePath: string;
+  fullPath: string;
+  sizeBytes: number;
+  formattedSize: string;
 }
 
 export interface AppConfig {
