@@ -74,6 +74,10 @@ async fn fetch_commits_from_github(
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
         
+        if status == reqwest::StatusCode::FORBIDDEN || status == reqwest::StatusCode::TOO_MANY_REQUESTS {
+            return Err("GitHub API rate limit exceeded. Please add a Personal Access Token in Settings.".to_string());
+        }
+
         // Parse error message if available
         let err_msg = if let Ok(json_body) = serde_json::from_str::<Value>(&body) {
             json_body.get("message")
@@ -139,8 +143,7 @@ fn get_behind_commits(repo: &git2::Repository, remote_commits: &[Value]) -> Vec<
 }
 
 #[tauri::command]
-pub(crate) async fn fetch_remote_status(app: tauri::AppHandle, repo_path: String, token: String) -> Result<RepoInfo, String> {
-    crate::validate_path(&app, &repo_path).await?;
+pub(crate) async fn fetch_remote_status(repo_path: String, token: String) -> Result<RepoInfo, String> {
     let path = std::path::Path::new(&repo_path);
     let mut info = crate::git_ops::get_repo_info(path)?;
 
@@ -189,7 +192,7 @@ pub(crate) async fn fetch_all_remotes(
             continue;
         }
 
-        match fetch_remote_status(app.clone(), repo.local_path.clone(), token.clone()).await {
+        match fetch_remote_status(repo.local_path.clone(), token.clone()).await {
             Ok(updated) => updated_repos.push(updated),
             Err(err) => {
                 println!("Failed syncing remote for {}: {}", repo.name, err);

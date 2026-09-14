@@ -35,6 +35,7 @@ pub struct RepoInfo {
     pub behind_commits: Vec<AheadCommit>,
     pub last_scanned: String,
     pub remote_type: Option<String>, // "github" | "other"
+    pub project_type: Option<String>,
 }
 
 pub fn get_branch_name(repo: &Repository) -> Result<String, String> {
@@ -271,6 +272,8 @@ pub fn get_repo_info(path: &Path) -> Result<RepoInfo, String> {
     let status = determine_status(&remote_url, ahead_count, behind_count, has_changes);
     let last_scanned = Utc::now().to_rfc3339();
     
+    let project_type = detect_project_type(path);
+    
     Ok(RepoInfo {
         id: local_path.clone(),
         name,
@@ -286,7 +289,32 @@ pub fn get_repo_info(path: &Path) -> Result<RepoInfo, String> {
         behind_commits: Vec::new(),
         last_scanned,
         remote_type,
+        project_type,
     })
+}
+
+pub fn detect_project_type(path: &Path) -> Option<String> {
+    if path.join("package.json").exists() {
+        Some("javascript".to_string())
+    } else if path.join("Cargo.toml").exists() {
+        Some("rust".to_string())
+    } else if path.join("go.mod").exists() {
+        Some("go".to_string())
+    } else if path.join("requirements.txt").exists() || path.join("pyproject.toml").exists() || path.join("setup.py").exists() {
+        Some("python".to_string())
+    } else if path.join("pom.xml").exists() || path.join("build.gradle").exists() {
+        Some("java".to_string())
+    } else if path.join("composer.json").exists() {
+        Some("php".to_string())
+    } else if path.join("CMakeLists.txt").exists() {
+        Some("cpp".to_string())
+    } else if path.join("package.swift").exists() {
+        Some("swift".to_string())
+    } else if path.join("pubspec.yaml").exists() {
+        Some("flutter".to_string())
+    } else {
+        None
+    }
 }
 
 #[cfg(target_os = "windows")]
@@ -318,13 +346,8 @@ pub fn open_explorer(path: &str) -> Result<(), String> {
 
 #[cfg(target_os = "windows")]
 pub fn open_vscode(path: &str) -> Result<(), String> {
-    std::process::Command::new("powershell.exe")
-        .args(&[
-            "-NoProfile",
-            "-Command",
-            "& { Start-Process code -ArgumentList @($args[0]) }",
-        ])
-        .arg(path)
+    std::process::Command::new("cmd")
+        .args(&["/C", "code", path])
         .spawn()
         .map_err(|e| e.to_string())?;
     Ok(())
@@ -338,3 +361,211 @@ pub fn open_vscode(path: &str) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     Ok(())
 }
+
+pub fn git_push(repo_path: &str) -> Result<(), String> {
+    let output = std::process::Command::new("git")
+        .current_dir(repo_path)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GPG_TTY", "")
+        .arg("push")
+        .output()
+        .map_err(|e| format!("Failed to run git push: {}", e))?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(if stderr.is_empty() {
+            "git push failed. Ensure SSH key/credentials are available.".to_string()
+        } else {
+            stderr.trim().to_string()
+        })
+    }
+}
+
+pub fn git_stash(repo_path: &str) -> Result<(), String> {
+    let output = std::process::Command::new("git")
+        .current_dir(repo_path)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GPG_TTY", "")
+        .args(&["stash", "save", "LagLine quick stash"])
+        .output()
+        .map_err(|e| format!("Failed to run git stash: {}", e))?;
+
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        Err(if stderr.is_empty() {
+            "git stash failed".to_string()
+        } else {
+            stderr.trim().to_string()
+        })
+    }
+}
+
+pub fn git_discard_changes(repo_path: &str) -> Result<(), String> {
+    // 1. Restore tracked changes
+    let output1 = std::process::Command::new("git")
+        .current_dir(repo_path)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GPG_TTY", "")
+        .args(&["restore", "."])
+        .output()
+        .map_err(|e| format!("Failed to restore files: {}", e))?;
+
+    if !output1.status.success() {
+        let stderr = String::from_utf8_lossy(&output1.stderr);
+        return Err(stderr.trim().to_string());
+    }
+
+    // 2. Clean untracked files & directories
+    let output2 = std::process::Command::new("git")
+        .current_dir(repo_path)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .env("GPG_TTY", "")
+        .args(&["clean", "-fd"])
+        .output()
+        .map_err(|e| format!("Failed to clean untracked files: {}", e))?;
+
+    if !output2.status.success() {
+        let stderr = String::from_utf8_lossy(&output2.stderr);
+        return Err(stderr.trim().to_string());
+    }
+
+    Ok(())
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+#[serde(rename_all = "camelCase")]
+pub struct HeavyFolderInfo {
+    pub name: String,
+    pub relative_path: String,
+    pub full_path: String,
+    pub size_bytes: u64,
+    pub formatted_size: String,
+}
+
+fn format_bytes(bytes: u64) -> String {
+    const KB: u64 = 1024;
+    const MB: u64 = KB * 1024;
+    const GB: u64 = MB * 1024;
+
+    if bytes >= GB {
+        format!("{:.2} GB", bytes as f64 / GB as f64)
+    } else if bytes >= MB {
+        format!("{:.1} MB", bytes as f64 / MB as f64)
+    } else if bytes >= KB {
+        format!("{:.0} KB", bytes as f64 / KB as f64)
+    } else {
+        format!("{} B", bytes)
+    }
+}
+
+fn get_dir_size(path: &Path) -> u64 {
+    let mut total_size = 0;
+    if let Ok(entries) = std::fs::read_dir(path) {
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if p.is_file() {
+                if let Ok(metadata) = entry.metadata() {
+                    total_size += metadata.len();
+                }
+            } else if p.is_dir() {
+                // Skip symlinks to avoid infinite loops
+                if let Ok(metadata) = entry.metadata() {
+                    if !metadata.file_type().is_symlink() {
+                        total_size += get_dir_size(&p);
+                    }
+                }
+            }
+        }
+    }
+    total_size
+}
+
+pub fn scan_heavy_folders(repo_path: &str) -> Vec<HeavyFolderInfo> {
+    let base = Path::new(repo_path);
+    if !base.exists() {
+        return Vec::new();
+    }
+
+    let target_names = [
+        "node_modules",
+        "target",
+        ".venv",
+        "venv",
+        "vendor",
+        ".next",
+        "dist",
+        "build",
+        "bin",
+        "obj",
+    ];
+
+    let mut results = Vec::new();
+
+    // Check root folder + 1 level deep (e.g. src-tauri/target or client/node_modules)
+    fn check_folder(
+        base_dir: &Path,
+        current_dir: &Path,
+        depth: usize,
+        target_names: &[&str],
+        results: &mut Vec<HeavyFolderInfo>,
+    ) {
+        if depth > 2 {
+            return;
+        }
+
+        let entries = match std::fs::read_dir(current_dir) {
+            Ok(e) => e,
+            Err(_) => return,
+        };
+
+        for entry in entries.flatten() {
+            let p = entry.path();
+            if !p.is_dir() {
+                continue;
+            }
+
+            let folder_name = match p.file_name().and_then(|s| s.to_str()) {
+                Some(n) => n,
+                None => continue,
+            };
+
+            if folder_name == ".git" {
+                continue;
+            }
+
+            if target_names.contains(&folder_name) {
+                let size_bytes = get_dir_size(&p);
+                if size_bytes > 1_000_000 {
+                    // Only list folders > 1MB
+                    let rel_path = p.strip_prefix(base_dir).unwrap_or(&p).to_string_lossy().to_string();
+                    results.push(HeavyFolderInfo {
+                        name: folder_name.to_string(),
+                        relative_path: rel_path,
+                        full_path: p.to_string_lossy().to_string(),
+                        size_bytes,
+                        formatted_size: format_bytes(size_bytes),
+                    });
+                }
+            } else if depth < 2 {
+                check_folder(base_dir, &p, depth + 1, target_names, results);
+            }
+        }
+    }
+
+    check_folder(base, base, 0, &target_names, &mut results);
+    results.sort_by(|a, b| b.size_bytes.cmp(&a.size_bytes));
+    results
+}
+
+pub fn remove_folder(full_path: &str) -> Result<(), String> {
+    let p = Path::new(full_path);
+    if !p.exists() {
+        return Ok(());
+    }
+    std::fs::remove_dir_all(p).map_err(|e| format!("Failed to delete folder {}: {}", full_path, e))
+}
+
