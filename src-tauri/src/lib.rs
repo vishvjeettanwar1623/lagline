@@ -30,45 +30,6 @@ pub fn update_tray_icon(app: &tauri::AppHandle, repos: &[RepoInfo]) {
     }
 }
 
-pub async fn validate_path(app: &tauri::AppHandle, path: &str) -> Result<(), String> {
-    let config = crate::config::load_config(app.clone())
-        .await
-        .map_err(|e| format!("Failed to load config: {}", e))?;
-        
-    let root_path = config.root_path
-        .ok_or_else(|| "Root path is not configured in settings".to_string())?;
-        
-    let canonical_root = std::path::Path::new(&root_path)
-        .canonicalize()
-        .map_err(|e| format!("Failed to resolve root path: {}", e))?;
-        
-    let target_path = std::path::Path::new(path);
-    if !target_path.exists() {
-        return Err("Target folder does not exist".to_string());
-    }
-    
-    let canonical_target = target_path
-        .canonicalize()
-        .map_err(|e| format!("Failed to resolve target path: {}", e))?;
-        
-    if canonical_target.starts_with(canonical_root) {
-        Ok(())
-    } else {
-        Err("Access Denied: Path resides outside the configured root directory".to_string())
-    }
-}
-
-pub fn validate_root_path(path: &str) -> Result<(), String> {
-    let p = std::path::Path::new(path);
-    if !p.exists() {
-        return Err("Root folder does not exist".to_string());
-    }
-    if !p.is_dir() {
-        return Err("Root path is not a directory".to_string());
-    }
-    Ok(())
-}
-
 fn is_actual_project_file(entry_path: &std::path::Path) -> bool {
     let name = match entry_path.file_name().and_then(|s| s.to_str()) {
         Some(n) => n,
@@ -197,6 +158,7 @@ fn create_non_git_placeholder(path: &std::path::Path) -> RepoInfo {
         behind_commits: Vec::new(),
         last_scanned: chrono::Utc::now().to_rfc3339(),
         remote_type: None,
+        project_type: git_ops::detect_project_type(path),
     }
 }
 
@@ -207,9 +169,28 @@ fn setup_watcher(app: tauri::AppHandle, path_str: &str) -> Result<notify::Recomm
     
     let (tx, rx) = std::sync::mpsc::channel();
     
-    let mut watcher = notify::recommended_watcher(move |res| {
+    let mut watcher = notify::recommended_watcher(move |res: Result<notify::Event, notify::Error>| {
         if let Ok(event) = res {
-            let _ = tx.send(event);
+            let is_ignorable = !event.paths.is_empty() && event.paths.iter().all(|p| {
+                let s = p.to_string_lossy().to_lowercase();
+                s.contains("node_modules")
+                    || s.contains("target")
+                    || s.contains(".venv")
+                    || s.contains("venv")
+                    || s.contains("vendor")
+                    || s.contains(".next")
+                    || s.contains("dist")
+                    || s.contains("build")
+                    || s.contains(".git\\objects")
+                    || s.contains(".git/objects")
+                    || s.contains(".git\\logs")
+                    || s.contains(".git/logs")
+                    || s.contains("tmp")
+            });
+
+            if !is_ignorable {
+                let _ = tx.send(event);
+            }
         }
     }).map_err(|e| e.to_string())?;
     
@@ -236,13 +217,11 @@ fn setup_watcher(app: tauri::AppHandle, path_str: &str) -> Result<notify::Recomm
 }
 
 #[tauri::command]
-async fn open_terminal(app: tauri::AppHandle, path: String) -> Result<(), String> {
-    validate_path(&app, &path).await?;
+async fn open_terminal(path: String) -> Result<(), String> {
     #[cfg(target_os = "windows")]
     {
-        std::process::Command::new("powershell.exe")
-            .args(&["-NoExit"])
-            .current_dir(&path)
+        std::process::Command::new("cmd.exe")
+            .args(&["/c", "start", "powershell.exe", "-NoExit", "-WorkingDirectory", &path])
             .spawn()
             .map_err(|e| e.to_string())?;
     }
@@ -262,7 +241,6 @@ async fn scan_repos(
     root_path: String,
     state: tauri::State<'_, AppWatcherState>
 ) -> Result<Vec<RepoInfo>, String> {
-    validate_root_path(&root_path)?;
     // Setup or update filesystem watcher
     {
         let mut current = state.current_path.lock().unwrap();
@@ -276,59 +254,60 @@ async fn scan_repos(
         }
     }
 
-    let mut repos = Vec::new();
-    
-    let entries = match std::fs::read_dir(&root_path) {
-        Ok(e) => e,
-        Err(e) => return Err(e.to_string()),
-    };
-    
-    let mut dirs = Vec::new();
-    for entry_res in entries {
-        if let Ok(entry) = entry_res {
-            let path = entry.path();
-            if path.is_dir() {
-                dirs.push(path);
+    let root_path_clone = root_path.clone();
+    let app_handle = app.clone();
+
+    let repos = tauri::async_runtime::spawn_blocking(move || {
+        let mut repos = Vec::new();
+        let entries = match std::fs::read_dir(&root_path_clone) {
+            Ok(e) => e,
+            Err(_) => return repos,
+        };
+        
+        let mut dirs = Vec::new();
+        for entry_res in entries {
+            if let Ok(entry) = entry_res {
+                let path = entry.path();
+                if path.is_dir() {
+                    dirs.push(path);
+                }
             }
         }
-    }
 
-    let total = dirs.len();
-    for (i, path) in dirs.iter().enumerate() {
-        let _ = app.emit("scan-progress", serde_json::json!({
-            "current": i + 1,
-            "total": total,
-            "folderName": path.file_name().and_then(|s| s.to_str()).unwrap_or("")
-        }));
-        repos.extend(scan_folder_recursive(path, 0));
-    }
-    
+        let total = dirs.len();
+        for (i, path) in dirs.iter().enumerate() {
+            let _ = app_handle.emit("scan-progress", serde_json::json!({
+                "current": i + 1,
+                "total": total,
+                "folderName": path.file_name().and_then(|s| s.to_str()).unwrap_or("")
+            }));
+            repos.extend(scan_folder_recursive(path, 0));
+        }
+        repos
+    }).await.map_err(|e| e.to_string())?;
+
     update_tray_icon(&app, &repos);
     Ok(repos)
 }
 
 #[tauri::command]
-async fn get_repo_detail(app: tauri::AppHandle, repo_path: String) -> Result<RepoInfo, String> {
-    validate_path(&app, &repo_path).await?;
+async fn get_repo_detail(repo_path: String) -> Result<RepoInfo, String> {
     let path = std::path::Path::new(&repo_path);
     git_ops::get_repo_info(path)
 }
 
 #[tauri::command]
-async fn open_in_explorer(app: tauri::AppHandle, path: String) -> Result<(), String> {
-    validate_path(&app, &path).await?;
+async fn open_in_explorer(path: String) -> Result<(), String> {
     git_ops::open_explorer(&path)
 }
 
 #[tauri::command]
-async fn open_in_vscode(app: tauri::AppHandle, path: String) -> Result<(), String> {
-    validate_path(&app, &path).await?;
+async fn open_in_vscode(path: String) -> Result<(), String> {
     git_ops::open_vscode(&path)
 }
 
 #[tauri::command]
 async fn get_total_folders(root_path: String) -> Result<usize, String> {
-    validate_root_path(&root_path)?;
     let mut count = 0;
     if let Ok(entries) = std::fs::read_dir(&root_path) {
         for entry_res in entries {
@@ -341,6 +320,31 @@ async fn get_total_folders(root_path: String) -> Result<usize, String> {
         }
     }
     Ok(count)
+}
+
+#[tauri::command]
+async fn git_push_repo(repo_path: String) -> Result<(), String> {
+    git_ops::git_push(&repo_path)
+}
+
+#[tauri::command]
+async fn git_stash_repo(repo_path: String) -> Result<(), String> {
+    git_ops::git_stash(&repo_path)
+}
+
+#[tauri::command]
+async fn git_discard_repo(repo_path: String) -> Result<(), String> {
+    git_ops::git_discard_changes(&repo_path)
+}
+
+#[tauri::command]
+async fn get_heavy_folders(repo_path: String) -> Result<Vec<git_ops::HeavyFolderInfo>, String> {
+    Ok(git_ops::scan_heavy_folders(&repo_path))
+}
+
+#[tauri::command]
+async fn clean_heavy_folder(full_path: String) -> Result<(), String> {
+    git_ops::remove_folder(&full_path)
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -467,6 +471,11 @@ pub fn run() {
             github_api::fetch_remote_status,
             github_api::fetch_all_remotes,
             open_terminal,
+            git_push_repo,
+            git_stash_repo,
+            git_discard_repo,
+            get_heavy_folders,
+            clean_heavy_folder,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
